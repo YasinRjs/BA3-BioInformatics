@@ -7,17 +7,56 @@ class Score:
 		self._seq1 = seq1
 		self._seq2 = seq2
 		self._Blosum = BlosumObj
+		self._similarAA = ['ST','TS','SP','PS','SA','AS','SG','GS','TP','PT','TA','AT','TG','GT','PA','AP','PG','GP','AG','GA','ND','DN','NE','EN','NQ','QN','DE','ED','DQ',
+'QD','EQ','QE','HR','RH','HK','KH','RK','KR','MI','IM','ML','LM','MV','VM','IL','LI','IV','VI','LV','VL','FY','YF','FW','WF','YW','WY'];
 
-		self._subMatrice = self.matriceSub()
-		self.findAlignement()
+		self._match = 2
+		self._mismatch = -1
+
+#============ GLOBAL ALIGN
+		self.globalAlignment()
+#============ LOCAL ALIGN
+		self.localAlignment()
 
 	def __str__(self):
 		return self._resultat
-
 	def getResultat(self):
 		return self._resultat
+	def globalAlignment(self):
+		print("================ Début alignement global ================")
+		matrice = self.globalMatriceSub()
+		align1,align2,score = self.globalScoreAndAlign(matrice)
+		self.printGlobalAlign(matrice,align1,align2,score)
+	def localAlignment(self):
+		print("================ Début alignement local ================")
+		mat,pointer,maxPos = self.localSubMatrice()
+		align1, align2 = self.traceback(mat,pointer,maxPos)
+		identity,similarity,score = self.result(align1,align2)
+		self.printLocalAlign(mat,maxPos,align1,align2,identity,similarity,score)
 
-	def matriceSub(self):
+	def printMatrice(self,mat):
+		for row in mat:
+			print(*row)
+	def printLocalAlign(self,mat,maxPos,align1,align2,identity,similarity,score):
+		#self.printMatrice(mat)
+		print("--> Position du max : ",maxPos)
+		print("===--- Alignement Local Terminé ---===")
+		print(align1)
+		print(align2)
+		print("Identité : ",identity, "%")
+		print("Similarité : ",similarity, "%")
+		print("Score : ",score)
+	def printGlobalAlign(self,mat,align1,align2,score):
+		print("===--- Alignement Global Terminé ---===")
+		#self.printMatrice(mat)
+		print(align1)
+		print(align2)
+		print("Score : ",score)
+
+
+
+
+	def globalMatriceSub(self):
 		m,n = len(self._seq1),len(self._seq2)
 		matrice = [[0 for i in range(n+1)] for j in range(m+1)]
 #============ PENALITE AFINE ==================
@@ -36,31 +75,30 @@ class Score:
 				left = matrice[i-1][j]+self._penalite
 				matrice[i][j] = max(up,left,blosValue)
 
-		#print(matrice)
 		return matrice
 
-	def findAlignement(self):
+	def globalScoreAndAlign(self,globalSubMatrice):
 		align1 = ""
 		align2 = ""
 		i = len(self._seq1)
 		j = len(self._seq2)
 
 		while (i>0 and j>0):
-			score = self._subMatrice[i][j]
-			scoreDiag = self._subMatrice[i-1][j-1]
-			scoreLeft = self._subMatrice[i][j-1]
-			scoreUp = self._subMatrice[i-1][j]
+			score = globalSubMatrice[i][j]
+			scoreDiag = globalSubMatrice[i-1][j-1]
+			scoreLeft = globalSubMatrice[i][j-1]
+			scoreUp = globalSubMatrice[i-1][j]
 
 			i1 = self._Blosum.getIndex(self._seq1[i-1])
 			i2 = self._Blosum.getIndex(self._seq2[j-1])
 			x2 = scoreDiag + self._Blosum.getValue(i1,i2)
 			
-			if score == x2:
-				a1,a2 = self._seq1[i-1],self._seq2[j-1]
-				i,j = i-1,j-1
-			elif score == scoreUp+self._penalite:
+			if score == scoreUp+self._penalite:
 				a1,a2 = self._seq1[i-1],"-"
 				i -= 1
+			elif score == x2:
+				a1,a2 = self._seq1[i-1],self._seq2[j-1]
+				i,j = i-1,j-1
 			elif score == scoreLeft + self._penalite:
 				a1,a2 = "-",self._seq2[j-1]
 				j -= 1
@@ -92,80 +130,126 @@ class Score:
 				ind1 = self._Blosum.getIndex(a1)
 				ind2 = self._Blosum.getIndex(a2)
 				score += self._Blosum.getValue(ind1,ind2)
-	
-		print("===--- Alignement terminé ---===")
 
-		print(align1)
-		print(align2)
-		print("Score : ",score)
+		return align1,align2,score
+
+	def localSubMatrice(self):
+		m,n = len(self._seq1),len(self._seq2)
+		matrice = [[0 for i in range(n+1)] for j in range(m+1)]
+		pointer = [[0 for i in range(n+1)] for j in range(m+1)]
+		maxScore = 0
+		maxPos = None
+
+		for i in range(1,m+1):
+			for j in range(1,n+1):
+				i1 = self._Blosum.getIndex(self._seq1[i-1])
+				i2 = self._Blosum.getIndex(self._seq2[j-1])
+				diag = matrice[i-1][j-1] + self._Blosum.getValue(i1,i2)
+				up = matrice[i-1][j] + self._penalite
+				left = matrice[i][j-1] + self._penalite
+				score = max(0,diag,up,left)
+
+				matrice[i][j] = score
+				if score == 0:
+					pointer[i][j] = 0
+				if score == up:
+					pointer[i][j] = 1
+				if score == left:
+					pointer[i][j] = 2
+				if score == diag:
+					pointer[i][j] = 3
+				if score >= maxScore:
+					maxPos = (i,j)
+					maxScore = score
+
+		return matrice,pointer,maxPos
+
+	def traceback(self,matrice,pointer,maxPos):
+		align1,align2 = "",""
+		i,j = maxPos
+		while pointer[i][j] != 0:
+			if pointer[i][j] == 3:
+				align1 += self._seq1[i-1]
+				align2 += self._seq2[j-1]
+				i -= 1
+				j -= 1
+			elif pointer[i][j] == 2:
+				align1 += "-"
+				align2 += self._seq2[j-1]
+				j -= 1
+			elif pointer[i][j] == 1:
+				align1 += self._seq1[i-1]
+				align2 += "-"
+				i -= 1
+
+		align1 = align1[::-1]
+		align2 = align2[::-1]
+
 		return align1,align2
 
-#=============================================
-
-			# score = self._subMatrice[i][j]
-			# scoreDiag = self._subMatrice[i-1][j-1]
-			# scoreUp = self._subMatrice[i][j-1]
-			# scoreLeft = self._subMatrice[i-1][j]
-
-
-			# score = self._subMatrice[i+1][j+1]
-			# scoreDiag = self._subMatrice[i][j]
-			# scoreUp = self._subMatrice[i+1][j]
-			# scoreLeft = self._subMatrice[i][j+1]
+	def valueInBlosum(self,alpha,beta):
+		i1 = self._Blosum.getIndex(alpha)
+		i2 = self._Blosum.getIndex(beta)
+		
+		return self._Blosum.getValue(i1,i2)
 
 
-			# score = self._subMatrice[j][i]
-			# scoreDiag = self._subMatrice[j-1][i-1]
-			# scoreUp = self._subMatrice[j][i-1]
-			# scoreLeft = self._subMatrice[j-1][i]
+	def result(self,align1,align2):
+		symbol=""
+		found = 0
+		score = 0
+		identity,similarity = 0,0
+		for i in range(len(align1)):
+			if align1[i]==align2[i]:
+				symbol += align1[i]
+				identity += 1
+				similarity += 1
+				score += self.valueInBlosum(align1[i],align2[i])
+			elif align1[i] != align2[i] and align1[i] != "-" and align2[i] != "-":
+				score += self.valueInBlosum(align1[i],align2[i])
+				for j in range(len(self._similarAA)):
+					if align1[i]+align2[i]==self._similarAA[j]:
+						found=1
+				if found:
+					symbol += ":"
+					similarity += 1
+				found = 0
+			elif align1[i] == "-" or align2[i] == "-":
+				symbol += " "
+				score += self._penalite
 
-			# score = self._subMatrice[i][j]
-			# scoreDiag = self._subMatrice[i-1][j-1]
-			# scoreUp = self._subMatrice[i-1][j]
-			# scoreLeft = self._subMatrice[i][j-1]
-"""
-			score = self._subMatrice[j][i]
-			scoreDiag = self._subMatrice[j-1][i-1]
-			scoreUp = self._subMatrice[j-1][i]
-			scoreLeft = self._subMatrice[j][i-1]
+		identity = float(identity)/len(align1)*100
+		similarity = float(similarity)/len(align2)*100
 
-			score = self._subMatrice[i][j]
-			scoreDiag = self._subMatrice[i-1][j-1]
-			scoreUp = self._subMatrice[i-1][j]
-			scoreLeft = self._subMatrice[i][j-1]
-
-
-		while (i>0 and j>0):
-			score = self._subMatrice[i][j]
-			scoreDiag = self._subMatrice[i-1][j-1]
-			scoreLeft = self._subMatrice[i][j-1]
-			scoreUp = self._subMatrice[i-1][j]
-
-			i1 = self._Blosum.getIndex(self._seq1[i-1])
-			i2 = self._Blosum.getIndex(self._seq2[j-1])
-			x2 = scoreDiag + self._Blosum.getValue(i1,i2)
-			
-			if self.isEqual(score,x2):
-				alignA = self._seq1[i] + alignA
-				alignB = self._seq2[j] + alignB
-				i -= 1
-				j -= 1
-			elif self.isEqual(score,scoreLeft+self._penalite):
-				alignA = self._seq1[i] + alignA
-				alignB = "-" + alignB
-				i -= 1
-			else:
-				alignA = "-" + alignA
-				alignB = self._seq2[j] + alignB
-				j -= 1
-		while (i>=0):
-			alignA = self._seq1[i] + alignA
-			alignB = "-" + alignB
-			i -= 1
-		while (j>=0):
-			alignA = "-" + alignA
-			alignB = self._seq2[j] + alignB
-			j -= 1
+		return identity,similarity,score
 
 """
+	def calcul_score(self,mat,x,y):
+		i1 = self._Blosum.getIndex(self._seq1[x-1])
+		i2 = self._Blosum.getIndex(self._seq2[y-1])
+
+		diag = mat[x-1][y-1] + self._Blosum.getValue(i1,i2)
+		up = mat[x-1][y] + self._penalite
+		left = mat[x][y-1] + self._penalite
+
+		return max(0,diag,up,left)		
+"""
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
