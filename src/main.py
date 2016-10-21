@@ -24,13 +24,15 @@ def main():
 
 	# print(mySequences[0])
 	# print(mySequences[1])
-	x1 = mySequences[0].getSeq()
-	x2 = mySequences[2].getSeq()
-	x1 = ["T","H","I","S","L","I","N","E"]
-	x2 = ["I","S","A","L","I","G","N","E","D"]
 
 	x1 = ["T","H","I","S","L","I","N","E","D","E","D","E","D"]
 	x2 = ["I","S","A","L","I","G","N","E","D","A","D","I"]
+	x1 = ["T","H","I","S","L","I","N","E"]
+	x2 = ["I","S","A","L","I","G","N","E","D"]
+	x1 = mySequences[0].getSeq()
+	x2 = mySequences[2].getSeq()
+	x1 = ["M","G","G","E","T","F","A"]
+	x2 = ["G","G","V","T","T","F"]
 
 	print(x1)
 	print(x2)

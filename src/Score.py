@@ -24,7 +24,8 @@ class Score:
 		return self._resultat
 	def globalAlignment(self):
 		print("================ Début alignement global ================")
-		matrice = self.globalMatriceSub()
+		matrice = self.globalMatAfine()
+		self.printMatrice(matrice)
 		align1,align2,score = self.globalScoreAndAlign(matrice)
 		self.printGlobalAlign(matrice,align1,align2,score)
 	def localAlignment(self):
@@ -48,12 +49,43 @@ class Score:
 		print("Score : ",score)
 	def printGlobalAlign(self,mat,align1,align2,score):
 		print("===--- Alignement Global Terminé ---===")
-		#self.printMatrice(mat)
 		print(align1)
 		print(align2)
 		print("Score : ",score)
 
 
+	def globalMatAfine(self):
+		m,n = len(self._seq1),len(self._seq2)
+		I = 4
+		E = 1
+
+		S = [[0 for i in range(n+1)] for j in range(m+1)]
+		V = [[0 for i in range(n+1)] for j in range(m+1)]
+		W = [[0 for i in range(n+1)] for j in range(m+1)]
+		S[0][1] = -I
+		V[0][1] = -I
+		W[0][1] = -I
+		S[1][0] = -I
+		V[1][0] = -I
+		W[1][0] = -I
+		for i in range(2,m+1):
+			V[i][0] = V[i-1][0] - E
+			W[i][0] = W[i-1][0] - E
+			S[i][0] = S[i-1][0] - E 
+		for j in range(2,n+1):
+			V[0][j] = V[0][j-1] - E
+			W[0][j] = W[0][j-1] - E
+			S[0][j] = S[0][j-1] - E
+		
+		for i in range(1,m+1):
+			for j in range(1,n+1):
+				V[i][j] = max((S[i-1][j]-I),(V[i-1][j]-E))
+				W[i][j] = max((S[i][j-1]-I),(W[i][j-1]-E))
+				i1 = self._Blosum.getIndex(self._seq1[i-1])
+				i2 = self._Blosum.getIndex(self._seq2[j-1])
+				S[i][j] = max((S[i-1][j-1]+self._Blosum.getValue(i1,i2)),(V[i][j]),(W[i][j]))
+		
+		return S
 
 
 	def globalMatriceSub(self):
